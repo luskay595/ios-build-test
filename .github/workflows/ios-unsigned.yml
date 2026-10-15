@@ -16,6 +16,8 @@ jobs:
         with:
           node-version: 22
       - run: npm install
+      # babel-preset-expo est requis par Metro mais absent de cette app minimale.
+      - run: npx expo install babel-preset-expo
       - run: npx expo prebuild --platform ios --no-install
         env:
           CI: '1'

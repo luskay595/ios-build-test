@@ -24,18 +24,26 @@ jobs:
         run: |
           cd ios
           WS=$(ls -d *.xcworkspace | head -1)
-          SCHEME=$(xcodebuild -workspace "$WS" -list -json | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).workspace.schemes[0]))")
-          echo "Workspace=$WS Scheme=$SCHEME"
+          # Le scheme de l'app = le nom de son .xcodeproj (et non un scheme de Pod).
+          SCHEME=$(ls -d *.xcodeproj | head -1 | sed 's/\.xcodeproj$//')
+          echo "Workspace=$WS  Scheme=$SCHEME"
           xcodebuild -workspace "$WS" -scheme "$SCHEME" -configuration Release -sdk iphoneos -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" PROVISIONING_PROFILE_SPECIFIER="" build
       - name: Empaquetage .ipa
         run: |
-          cd ios/build/Build/Products/Release-iphoneos
-          APP=$(ls -d *.app | head -1)
-          mkdir -p Payload && cp -R "$APP" Payload/
-          zip -qr app-unsigned.ipa Payload
+          APP=$(find ios/build/Build/Products -maxdepth 3 -name '*.app' -type d | head -1)
+          echo "App=$APP"
+          if [ -z "$APP" ]; then
+            echo "Aucun .app trouvé — contenu des Products :"
+            find ios/build/Build/Products -maxdepth 3 || true
+            exit 1
+          fi
+          mkdir -p out/Payload
+          cp -R "$APP" out/Payload/
+          (cd out && zip -qr app-unsigned.ipa Payload)
+          ls -la out/app-unsigned.ipa
       - uses: actions/upload-artifact@v4
         with:
           name: ios-unsigned-ipa
-          path: ios/build/Build/Products/Release-iphoneos/app-unsigned.ipa
+          path: out/app-unsigned.ipa
           if-no-files-found: error

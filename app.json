@@ -1,0 +1,9 @@
+{
+  "expo": {
+    "name": "ios-build-test",
+    "slug": "ios-build-test",
+    "version": "1.0.0",
+    "ios": { "bundleIdentifier": "com.luskay595.iosbuildtest" },
+    "newArchEnabled": true
+  }
+}

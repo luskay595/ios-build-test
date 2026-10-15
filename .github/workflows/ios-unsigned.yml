@@ -1,0 +1,41 @@
+name: iOS unsigned IPA (test)
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Xcode 26
+        run: |
+          XC=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          sudo xcode-select -s "${XC:-/Applications/Xcode.app}"
+          xcodebuild -version
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npx expo prebuild --platform ios --no-install
+        env:
+          CI: '1'
+      - run: cd ios && pod install --repo-update
+      - name: Build (non signé)
+        run: |
+          cd ios
+          WS=$(ls -d *.xcworkspace | head -1)
+          SCHEME=$(xcodebuild -workspace "$WS" -list -json | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).workspace.schemes[0]))")
+          echo "Workspace=$WS Scheme=$SCHEME"
+          xcodebuild -workspace "$WS" -scheme "$SCHEME" -configuration Release -sdk iphoneos -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" PROVISIONING_PROFILE_SPECIFIER="" build
+      - name: Empaquetage .ipa
+        run: |
+          cd ios/build/Build/Products/Release-iphoneos
+          APP=$(ls -d *.app | head -1)
+          mkdir -p Payload && cp -R "$APP" Payload/
+          zip -qr app-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-unsigned-ipa
+          path: ios/build/Build/Products/Release-iphoneos/app-unsigned.ipa
+          if-no-files-found: error
